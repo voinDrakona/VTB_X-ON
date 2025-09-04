@@ -1,0 +1,131 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Система анализа резюме</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <style>
+        .hidden { display: none; }
+        .btn { padding: 10px 20px; background: #4CAF50; color: white; border: none; border-radius: 5px; text-decoration: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📄 Анализ резюме</h1>
+            <p>Загрузите ваше резюме для проверки соответствия требованиям</p>
+        </div>
+
+        <!-- Кнопка перехода к интервью -->
+        <a href="/interview" class="btn hidden" id="interview-btn">🚀 Перейти к онлайн-собеседованию</a>
+
+        <!-- Форма загрузки резюме -->
+        <form id="resume-form" class="upload-form">
+            <div class="form-group">
+                <label for="fullname">ФИО *</label>
+                <input type="text" id="fullname" name="fullname" required placeholder="Иванов Иван Иванович">
+            </div>
+
+            <div class="form-group">
+                <label for="resume-file">Резюме (PDF, DOC, DOCX) *</label>
+                <div class="file-upload">
+                    <input type="file" id="resume-file" name="resume" accept=".pdf,.doc,.docx" required>
+                    <label for="resume-file" class="file-label">
+                        <span class="file-icon">📎</span>
+                        <span class="file-text">Выберите файл</span>
+                    </label>
+                </div>
+                <div id="file-name" class="file-name"></div>
+            </div>
+
+            <button type="submit" class="submit-btn">Отправить на проверку</button>
+        </form>
+
+        <!-- Результат проверки -->
+        <div id="result-section" class="result-section hidden">
+            <h2>Результат проверки</h2>
+            <div id="result-message" class="result-message"></div>
+            <button onclick="resetForm()" class="reset-btn">Загрузить новое резюме</button>
+        </div>
+
+        <!-- Лоадер -->
+        <div class="loading hidden" id="loading">
+            <div class="spinner"></div>
+            <p>Идёт обработка резюме...</p>
+        </div>
+    </div>
+
+    <script>
+        const resumeForm = document.getElementById('resume-form');
+        const resultSection = document.getElementById('result-section');
+        const resultMessage = document.getElementById('result-message');
+        const loading = document.getElementById('loading');
+        const interviewBtn = document.getElementById('interview-btn');
+        const fileInput = document.getElementById('resume-file');
+        const fileNameDiv = document.getElementById('file-name');
+
+        // Показывать имя файла
+        fileInput.addEventListener('change', () => {
+            if (fileInput.files.length > 0) {
+                fileNameDiv.textContent = fileInput.files[0].name;
+            } else {
+                fileNameDiv.textContent = '';
+            }
+        });
+
+        resumeForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const fullname = document.getElementById('fullname').value.trim();
+            if (!fullname || !fileInput.files.length) {
+                alert("Заполните все поля и выберите файл резюме");
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('resume', fileInput.files[0]);
+            formData.append('fullname', fullname);
+
+            loading.classList.remove('hidden');
+            resultSection.classList.add('hidden');
+
+            try {
+                const response = await fetch('/api/upload-resume', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                loading.classList.add('hidden');
+
+                if (data.error) {
+                    alert("Ошибка: " + data.error);
+                    return;
+                }
+
+                // Показать результат
+                resultMessage.textContent = `${data.accepted ? "Резюме принято ✅" : "Резюме отклонено ❌"}`;
+                resultSection.classList.remove('hidden');
+
+                // Показать кнопку интервью только если принято
+                if (data.accepted) {
+                    interviewBtn.classList.remove('hidden');
+                } else {
+                    interviewBtn.classList.add('hidden');
+                }
+
+            } catch (err) {
+                loading.classList.add('hidden');
+                alert("Ошибка сервера: " + err);
+            }
+        });
+
+        function resetForm() {
+            resumeForm.reset();
+            resultSection.classList.add('hidden');
+            interviewBtn.classList.add('hidden');
+            fileNameDiv.textContent = '';
+        }
+    </script>
+</body>
+</html>
