@@ -7,15 +7,16 @@ from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from openai import OpenAI
 import subprocess
-import simpleaudio  # для воспроизведения .wav
+# import simpleaudio  # для воспроизведения .wav
 import tempfile
 import torch
-import sounddevice as sd
+# import sounddevice as sd
 
 from resume_check import analyze_resume 
 from into_text import extract_text_from_file
 
 PASSING_SCORE_RESUME    = 49
+# PASSING_SCORE_RESUME    = 1
 COUNT_QUESTIONS         = 5
 PASSING_SCORE_INTERVIEW = 3
 
@@ -54,15 +55,15 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# def speak_text_local(text):
-#     subprocess.run(["say", "-v", "Milena", text])
+def speak_text_local(text):
+    subprocess.run(["say", "-v", "Milena", text])
 
-def speak_text_local(text: str):
-    audio = model.apply_tts(text=text, speaker=speaker, sample_rate=sample_rate)
+# def speak_text_local(text: str):
+#     audio = model.apply_tts(text=text, speaker=speaker, sample_rate=sample_rate)
 
-    # Воспроизведение через динамики
-    sd.play(audio, sample_rate)
-    sd.wait()
+#     # Воспроизведение через динамики
+#     sd.play(audio, sample_rate)
+#     sd.wait()
 
 # -------------------- Логика интервью --------------------
 class InterviewState:
@@ -165,7 +166,7 @@ def index():
 def upload_resume():
     try:
         fullname = request.form.get('fullname')
-        # state.speciality = также как и выше
+        topic = request.form.get('interview-topic')
 
         if 'resume' not in request.files:
             return jsonify({'success': False, 'error': 'Файл не найден'})
@@ -179,11 +180,14 @@ def upload_resume():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
 
-            result = analyze_resume(filepath, PASSING_SCORE_RESUME)
-            # result = analyze_resume(filepath, PASSING_SCORE_RESUME, speciality)
+            # result = analyze_resume(filepath, PASSING_SCORE_RESUME)
+            result = analyze_resume(filepath, PASSING_SCORE_RESUME, topic)
 
             state.resume_text = extract_text_from_file(filepath)
             result['resume_text'] = state.resume_text
+
+            # добавь поле accepted
+            result['accepted'] = result.get("passed", False)
 
             return jsonify(result)
 

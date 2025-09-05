@@ -6,7 +6,7 @@ from sentence_transformers import SentenceTransformer, util
 
 model = SentenceTransformer("sentence-transformers/paraphrase-multilingual-MiniLM-L12-v2")
 
-def analyze_resume(file_path, passing_score, speciality='python'):
+def analyze_resume(file_path, passing_score, speciality):
     text = extract_text_from_file(file_path)
 
     job_embedding = model.encode(speciality, convert_to_tensor=True)
