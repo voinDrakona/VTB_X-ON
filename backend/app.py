@@ -10,13 +10,12 @@ import subprocess
 # import simpleaudio  # для воспроизведения .wav
 import tempfile
 import torch
-# import sounddevice as sd
+import sounddevice as sd
 
 from resume_check import analyze_resume 
 from into_text import extract_text_from_file
 
 PASSING_SCORE_RESUME    = 49
-# PASSING_SCORE_RESUME    = 1
 COUNT_QUESTIONS         = 5
 PASSING_SCORE_INTERVIEW = 3
 
@@ -55,15 +54,15 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-def speak_text_local(text):
-    subprocess.run(["say", "-v", "Milena", text])
+# def speak_text_local(text):
+#     subprocess.run(["say", "-v", "Milena", text])
 
-# def speak_text_local(text: str):
-#     audio = model.apply_tts(text=text, speaker=speaker, sample_rate=sample_rate)
+def speak_text_local(text: str):
+    audio = model.apply_tts(text=text, speaker=speaker, sample_rate=sample_rate)
 
-#     # Воспроизведение через динамики
-#     sd.play(audio, sample_rate)
-#     sd.wait()
+    # Воспроизведение через динамики
+    sd.play(audio, sample_rate)
+    sd.wait()
 
 # -------------------- Логика интервью --------------------
 class InterviewState:
@@ -91,6 +90,7 @@ def start_interview_with_resume():
         f"Вот резюме кандидата:\n{state.resume_text}\n\n"
         f"Вот специальность для кандидата:\n{state.topic}\n\n"
         f"Выдели направление и начни интервью с первого вопроса по ней."
+        "Ты можешь залавать более углублённые впросы исходя из предыдущего вопросв"
     )
 
     state.story_messages = [

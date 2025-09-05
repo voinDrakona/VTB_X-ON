@@ -1,4 +1,7 @@
 let sessionId = null;
+let recognition = null;
+let isRecording = false;
+
 
 function addMessage(text, sender) {
     const chatBox = document.getElementById("chat-box");
@@ -59,3 +62,50 @@ async function sendAnswer() {
         document.getElementById("chat-section").classList.add("hidden");
     }
 }
+
+// === Голосовой ввод ===
+function initVoice() {
+    if (!("webkitSpeechRecognition" in window)) {
+        alert("Ваш браузер не поддерживает голосовой ввод 😢");
+        return;
+    }
+    recognition = new webkitSpeechRecognition();
+    recognition.lang = "ru-RU";
+    recognition.continuous = false;
+    recognition.interimResults = false;
+
+    recognition.onresult = function(event) {
+        const transcript = event.results[0][0].transcript;
+        document.getElementById("user-answer").value = transcript;
+        sendAnswer();
+    };
+
+    recognition.onerror = function(e) {
+        console.error("Speech recognition error", e);
+        isRecording = false;
+        document.getElementById("voice-btn").textContent = "🎤 Говорить";
+    };
+
+    recognition.onend = function() {
+        isRecording = false;
+        document.getElementById("voice-btn").textContent = "🎤 Говорить";
+    };
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    initVoice();
+
+    const voiceBtn = document.getElementById("voice-btn");
+    voiceBtn.addEventListener("click", () => {
+        if (!recognition) return;
+        if (!isRecording) {
+            recognition.start();
+            isRecording = true;
+            voiceBtn.textContent = "🛑 Стоп";
+        } else {
+            recognition.stop();
+            isRecording = false;
+            voiceBtn.textContent = "🎤 Говорить";
+        }
+    });
+});
