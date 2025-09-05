@@ -1,5 +1,4 @@
 import os
-from queue import Full
 import uuid
 import json
 from flask import Flask, request, jsonify, render_template
@@ -7,6 +6,11 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from openai import OpenAI
+import subprocess
+import simpleaudio  # для воспроизведения .wav
+import tempfile
+import torch
+import sounddevice as sd
 
 from resume_check import analyze_resume 
 from into_text import extract_text_from_file
@@ -14,6 +18,18 @@ from into_text import extract_text_from_file
 PASSING_SCORE_RESUME    = 49
 COUNT_QUESTIONS         = 5
 PASSING_SCORE_INTERVIEW = 3
+
+model, _ = torch.hub.load(
+    repo_or_dir='snakers4/silero-models',
+    model='silero_tts',
+    language='ru',
+    speaker='v3_1_ru'
+)
+
+# Настройки
+sample_rate = 48000
+speaker = 'baya'  # варианты: 'aidar', 'baya', 'kseniya', 'xenia', 'eugene'
+
 
 # -------------------- Инициализация --------------------
 load_dotenv()
@@ -38,6 +54,15 @@ os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
+# def speak_text_local(text):
+#     subprocess.run(["say", "-v", "Milena", text])
+
+def speak_text_local(text: str):
+    audio = model.apply_tts(text=text, speaker=speaker, sample_rate=sample_rate)
+
+    # Воспроизведение через динамики
+    sd.play(audio, sample_rate)
+    sd.wait()
 
 # -------------------- Логика интервью --------------------
 class InterviewState:
@@ -78,6 +103,7 @@ def start_interview_with_resume():
 
     first_question = response.choices[0].message.content.strip()
     print("gpt_response:", first_question)
+    speak_text_local(first_question)
     state.story_messages.append({"role": "assistant", "content": first_question})
 
     return first_question
@@ -102,6 +128,7 @@ def evaluate_answer(answer):
     )
     next_question = response.choices[0].message.content.strip()
     print("gpt_next_question:", next_question)
+    speak_text_local(next_question)
     state.story_messages.append({"role": "assistant", "content": next_question})
 
     # отдельный запрос для оценки ответа (НЕ пишем это в messages!)
