@@ -104,11 +104,11 @@
                 }
 
                 // Показать результат
-                resultMessage.textContent = `${data.accepted ? "Резюме принято ✅" : "Резюме отклонено ❌"}`;
+                resultMessage.textContent = `${data.passed ? "Резюме принято ✅" : "Резюме отклонено ❌"}`;
                 resultSection.classList.remove('hidden');
 
                 // Показать кнопку интервью только если принято
-                if (data.accepted) {
+                if (data.passed) {
                     interviewBtn.classList.remove('hidden');
                 } else {
                     interviewBtn.classList.add('hidden');

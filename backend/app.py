@@ -1,4 +1,5 @@
 import os
+from queue import Full
 import uuid
 import json
 from flask import Flask, request, jsonify, render_template
@@ -7,12 +8,16 @@ from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from openai import OpenAI
 
+from resume_check import analyze_resume 
+from into_text import extract_text_from_file
+
+PASSING_SCORE_RESUME    = 49
+COUNT_QUESTIONS         = 5
+PASSING_SCORE_INTERVIEW = 3
+
 # -------------------- Инициализация --------------------
 load_dotenv()
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-
-from resume_check import analyze_resume 
-from into_text import extract_text_from_file
 
 app = Flask(
     __name__,
@@ -36,20 +41,20 @@ def allowed_file(filename):
 
 # -------------------- Логика интервью --------------------
 class InterviewState:
-    def __init__(self, topic, level, resume_text):
-        self.topic = topic
-        self.level = level
-        self.resume_text = resume_text
-        self.messages = []   # история диалога
+    def __init__(self):
+        self.topic = ""
+        self.level = ""
+        self.resume_text = ""
+        self.story_messages = []
         self.scores = []
         self.finished = False
 
 
 sessions = {}
+state = InterviewState()
 
-
-def start_interview_with_resume(resume_text, topic, level):
-    """Создаём system prompt + сразу первый вопрос от GPT"""
+# Создаём system prompt + сразу первый вопрос от GPT
+def start_interview_with_resume():
     system_prompt = (
         "Ты — строгий технический интервьюер.\n"
         "Задавай вопросы на основе резюме кандидата и указанной темы.\n"
@@ -57,40 +62,50 @@ def start_interview_with_resume(resume_text, topic, level):
         "После ответа кандидата ты должен оценить его по системе:\n"
         "1 = очень плохо, 2 = плохо, 3 = средне, 4 = хорошо, 5 = отлично.\n"
         "Ты должен выдавать JSON с оценкой: {\"score\": int, \"reasoning\": str}.\n"
+        f"Вот резюме кандидата:\n{state.resume_text}\n\n"
+        f"Вот специальность для кандидата:\n{state.topic}\n\n"
+        f"Выдели направление и начни интервью с первого вопроса по ней."
     )
 
-    messages = [
+    state.story_messages = [
         {"role": "system", "content": system_prompt},
-        {"role": "user", "content": f"Вот резюме кандидата:\n{resume_text}\n\nНачни интервью с первого вопроса по теме {topic}, уровень {level}."}
     ]
 
-    resp = client.chat.completions.create(
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=messages
+        messages=state.story_messages
     )
 
-    first_q = resp.choices[0].message.content.strip()
-    messages.append({"role": "assistant", "content": first_q})
+    first_question = response.choices[0].message.content.strip()
+    print("gpt_response:", first_question)
+    state.story_messages.append({"role": "assistant", "content": first_question})
 
-    return messages, first_q
+    return first_question
 
 
-def evaluate_answer(messages, answer):
-    # добавляем ответ кандидата в историю
-    messages.append({"role": "user", "content": answer})
+# Получили ответ безработного
+def evaluate_answer(answer):
+    state.story_messages.append({"role": "user", "content": answer})
 
-    # GPT генерирует следующий вопрос (без оценки)
-    resp = client.chat.completions.create(
+    response = client.chat.completions.create(
         model="gpt-4o-mini",
-        messages=messages
+        messages=[
+            {
+                "role": "assistant",
+                "content": (
+                    f"Проанализируй историюю общения:\n{state.story_messages}\n\n"
+                    "и составь следующий вопрос собеседования."
+                    "не пиши лишний текст."
+                )
+            }
+        ],
     )
-    next_q = resp.choices[0].message.content.strip()
-
-    # сохраняем только следующий вопрос в историю
-    messages.append({"role": "assistant", "content": next_q})
+    next_question = response.choices[0].message.content.strip()
+    print("gpt_next_question:", next_question)
+    state.story_messages.append({"role": "assistant", "content": next_question})
 
     # отдельный запрос для оценки ответа (НЕ пишем это в messages!)
-    eval_resp = client.chat.completions.create(
+    eval_answer = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {
@@ -106,9 +121,10 @@ def evaluate_answer(messages, answer):
         response_format={"type": "json_object"}
     )
 
-    evaluation = json.loads(eval_resp.choices[0].message.content)
+    evaluation = json.loads(eval_answer.choices[0].message.content)
+    state.scores.append(evaluation["score"])
 
-    return evaluation, next_q
+    return evaluation, next_question
 
 
 
@@ -122,6 +138,7 @@ def index():
 def upload_resume():
     try:
         fullname = request.form.get('fullname')
+        # state.speciality = также как и выше
 
         if 'resume' not in request.files:
             return jsonify({'success': False, 'error': 'Файл не найден'})
@@ -135,14 +152,11 @@ def upload_resume():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
 
-            # Анализируем резюме
-            result = analyze_resume(filepath)
-            rating = result['data']['score']
-            result['accepted'] = rating >= 60
+            result = analyze_resume(filepath, PASSING_SCORE_RESUME)
+            # result = analyze_resume(filepath, PASSING_SCORE_RESUME, speciality)
 
-            # Извлекаем текст для интервью
-            resume_text = extract_text_from_file(filepath)
-            result['resume_text'] = resume_text
+            state.resume_text = extract_text_from_file(filepath)
+            result['resume_text'] = state.resume_text
 
             return jsonify(result)
 
@@ -161,18 +175,14 @@ def interview_page():
 @app.route('/api/start_interview', methods=['POST'])
 def start_interview():
     data = request.json
-    topic = data.get("topic")
-    level = data.get("level")
     resume_text = data.get("resume_text")
 
     session_id = str(uuid.uuid4())
-    messages, first_q = start_interview_with_resume(resume_text, topic, level)
+    first_question = start_interview_with_resume()
 
-    state = InterviewState(topic, level, resume_text)
-    state.messages = messages
     sessions[session_id] = state
 
-    return jsonify({"session_id": session_id, "question": first_q})
+    return jsonify({"session_id": session_id, "question": first_question})
 
 
 @app.route('/api/answer', methods=['POST'])
@@ -186,20 +196,19 @@ def post_answer():
 
     state = sessions[session_id]
 
-    evaluation, next_q = evaluate_answer(state.messages, answer)
-    state.scores.append(evaluation["score"])
+    evaluation, next_question = evaluate_answer(answer)
 
-    finished = len(state.scores) >= 5  # допустим 5 вопросов максимум
-    passed = finished and (sum(state.scores) / len(state.scores) >= 3)
+    finished = len(state.scores) >= COUNT_QUESTIONS
+    passed = finished and (sum(state.scores) / len(state.scores) >= PASSING_SCORE_INTERVIEW)
 
     if finished:
         state.finished = True
-        next_q = None
+        next_question = None
 
     return jsonify({
         "reasoning": evaluation["reasoning"],
         "score": evaluation["score"],
-        "next_question": next_q,
+        "next_question": next_question,
         "finished": finished,
         "passed": passed
     })
