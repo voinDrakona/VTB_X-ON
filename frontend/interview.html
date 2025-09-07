@@ -3,23 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🤖 Онлайн-собеседование</title>
+    <title>Онлайн-собеседование</title>
+
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
-    <style>
-        .chat-container { max-width: 700px; margin: 20px auto; border: 1px solid #ddd; border-radius: 10px; padding: 15px; background: #fafafa; }
-        .chat-box { height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; background: white; display: flex; flex-direction: column; }
-        .msg { margin: 8px 0; padding: 8px 12px; border-radius: 8px; max-width: 80%; }
-        .msg.bot { background: #e3f2fd; align-self: flex-start; }
-        .msg.user { background: #c8e6c9; align-self: flex-end; margin-left: auto; }
-        .chat-input { display: flex; gap: 10px; }
-        .chat-input input { flex: 1; padding: 8px; }
-        .hidden { display: none; }
-    </style>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/interviewStyle.css') }}">
+
+    <script src="{{ url_for('static', filename='js/interview.js') }}"></script>
 </head>
 <body>
     <div class="container">
         <div class="header">
-            <h1>🤖 Онлайн-собеседование</h1>
+            <h1>Онлайн-собеседование</h1>
             <p>Пройдите тестовое интервью по выбранной теме</p>
         </div>
 
@@ -27,7 +21,6 @@
             <div class="chat-box" id="chat-box"></div>
             
             <div id="setup-section">
-                <label>Тема: <input type="text" id="topic" placeholder="Например: Python"></label>
                 <label>Уровень: 
                     <select id="level">
                         <option value="junior">Junior</option>
@@ -47,98 +40,5 @@
             </div>
         </div>
     </div>
-
-    <script>
-        let sessionId = null;
-
-        function addMessage(text, sender) {
-            const chatBox = document.getElementById("chat-box");
-            const div = document.createElement("div");
-            div.className = `msg ${sender}`;
-            div.textContent = text;
-            chatBox.appendChild(div);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
-
-        async function startInterview() {
-            const topic = document.getElementById("topic").value.trim();
-            const level = document.getElementById("level").value;
-
-            const resp = await fetch("/api/start_interview", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ topic, level })
-            });
-            const data = await resp.json();
-            if (data.error) {
-                alert("Ошибка: " + JSON.stringify(data.error));
-                return;
-            }
-            sessionId = data.session_id;
-            document.getElementById("setup-section").classList.add("hidden");
-            document.getElementById("chat-section").classList.remove("hidden");
-
-            addMessage("Интервью началось! " + data.question, "bot");
-        }
-
-        async function sendAnswer() {
-            const input = document.getElementById("user-answer");
-            const answer = input.value.trim();
-            if (!answer) return;
-            addMessage(answer, "user");
-            input.value = "";
-
-            const resp = await fetch("/api/answer", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ session_id: sessionId, answer })
-            });
-            const data = await resp.json();
-
-            if (data.reasoning) {
-                addMessage("Оценка: " + data.reasoning + " (Баллы: " + data.score + ")", "bot");
-            }
-            if (data.next_question) {
-                addMessage(data.next_question, "bot");
-            }
-            if (data.finished) {
-                if (data.passed) {
-                    addMessage("✅ Интервью завершено: Кандидат прошёл!", "bot");
-                } else {
-                    addMessage("❌ Интервью завершено: Кандидат не прошёл.", "bot");
-                }
-                document.getElementById("chat-section").classList.add("hidden");
-            }
-        }
-
-        // Голосовой ввод
-        const voiceBtn = document.getElementById("voice-btn");
-        const userInput = document.getElementById("user-answer");
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-
-        if (SpeechRecognition) {
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'ru-RU';
-            recognition.continuous = false;
-            recognition.interimResults = false;
-
-            voiceBtn.addEventListener("click", () => {
-                recognition.start();
-            });
-
-            recognition.addEventListener("result", (event) => {
-                const transcript = event.results[0][0].transcript;
-                userInput.value = transcript;
-                sendAnswer();
-            });
-
-            recognition.addEventListener("end", () => {
-                console.log("Распознавание завершено");
-            });
-
-        } else {
-            alert("Ваш браузер не поддерживает голосовой ввод");
-        }
-    </script>
 </body>
 </html>

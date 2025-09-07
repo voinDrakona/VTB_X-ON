@@ -1,132 +1,233 @@
 document.addEventListener('DOMContentLoaded', function() {
-    // Обработка выбора файла
-    const fileInput = document.getElementById('resume-file');
-    const fileName = document.getElementById('file-name');
-    
-    fileInput.addEventListener('change', function() {
-        if (this.files.length > 0) {
-            fileName.textContent = this.files[0].name;
-        } else {
-            fileName.textContent = '';
-        }
-    });
-    
-    // Обработка отправки формы
-    const form = document.getElementById('resume-form');
-    form.addEventListener('submit', handleFormSubmit);
+const resumeForm = document.getElementById('resume-form');
+const resultSection = document.getElementById('result-section');
+const resultMessage = document.getElementById('result-message');
+const loadingOverlay = document.getElementById('loading-overlay');
+const successOverlay = document.getElementById('success-overlay');
+const mainContainer = document.getElementById('main-container');
+const fileInput = document.getElementById('resume-file');
+const fileNameDiv = document.getElementById('file-name');
+const fileLabel = document.getElementById('file-label');
+const topicSelect = document.getElementById('interview-topic');
+const submitBtn = document.getElementById('submit-btn');
+const failureOverlay = document.getElementById('failure-overlay');
+
+// Обработчик изменения выбора темы
+topicSelect.addEventListener('change', function() {
+    if (topicSelect.value !== '') {
+        fileInput.disabled = false;
+        fileLabel.classList.remove('disabled');
+        fileLabel.querySelector('.file-text').textContent = 'Выберите файл';
+    } else {
+        fileInput.disabled = true;
+        fileLabel.classList.add('disabled');
+        fileLabel.querySelector('.file-text').textContent = 'Выберите файл (доступно после выбора темы)';
+        fileNameDiv.textContent = '';
+        submitBtn.disabled = true;
+    }
 });
 
-async function handleFormSubmit(e) {
-    e.preventDefault();
-    
-    const form = e.target;
-    const formData = new FormData(form);
-    
-    const fullname = formData.get('fullname');
-    const resumeFile = formData.get('resume');
-    
-    if (!fullname.trim()) {
-        showResult('Пожалуйста, введите ФИО', false, {});
-        return;
+// Показывать имя файла и активировать кнопку отправки
+fileInput.addEventListener('change', () => {
+    if (fileInput.files.length > 0) {
+        fileNameDiv.textContent = fileInput.files[0].name;
+        // Проверяем, заполнены ли все обязательные поля
+        const fullname = document.getElementById('fullname').value.trim();
+        if (fullname && topicSelect.value) {
+            submitBtn.disabled = false;
+        }
+    } else {
+        fileNameDiv.textContent = '';
+        submitBtn.disabled = true;
     }
-    
-    if (!resumeFile || resumeFile.size === 0) {
-        showResult('Пожалуйста, выберите файл резюме', false, {});
-        return;
-    }
-    
-    showLoading(true);
+});
 
-    // Отключаем кнопку, чтобы нельзя было повторно отправить форму
-    const submitButton = form.querySelector('button[type="submit"]');
-    submitButton.disabled = true;
+// Проверка заполнения ФИО
+document.getElementById('fullname').addEventListener('input', function() {
+    const fullname = this.value.trim();
+    const hasFile = fileInput.files.length > 0;
+    const hasTopic = topicSelect.value !== '';
     
+    submitBtn.disabled = !(fullname && hasFile && hasTopic);
+});
+
+// resumeForm.addEventListener('submit', async (e) => {
+//     e.preventDefault();
+
+//     const fullname = document.getElementById('fullname').value.trim();
+//     const topic = topicSelect.value;
+    
+//     if (!fullname || !fileInput.files.length || !topic) {
+//         alert("Заполните все обязательные поля");
+//         return;
+//     }
+
+//     const formData = new FormData();
+//     formData.append('resume', fileInput.files[0]);
+//     formData.append('fullname', fullname);
+//     formData.append('interview-topic', topic);
+
+//     // Показываем лоадер поверх всего
+//     mainContainer.classList.add('blurred');
+//     loadingOverlay.classList.add('visible');
+//     resultSection.classList.add('hidden');
+
+//     try {
+//         const response = await fetch('http://localhost:5001/api/upload-resume', {
+//             method: 'POST',
+//             body: formData
+//         });
+
+//         const data = await response.json();
+
+//         if (data.success) {
+//             showResult(data.message, data.passed, data.data || {});
+//         } else {
+//             showResult(data.error || 'Произошла ошибка при обработке', false, {});
+//         }
+
+
+//         function showResult(message, passed, extraData) {
+//         const resultSection = document.getElementById('result-section');
+//         const resultMessage = document.getElementById('result-message');
+
+//         if (passed) {
+//             resultMessage.textContent = message || "Резюме прошло проверку ✅";
+//         } else {
+//             resultMessage.textContent = message || "Резюме отклонено ❌";
+//         }
+
+//         resultSection.classList.remove('hidden');
+//     }
+        
+//         setTimeout(() => {
+//             // Скрываем лоадер
+//             loadingOverlay.classList.remove('visible');
+//             mainContainer.classList.remove('blurred');
+
+//             if (data.error) {
+//                 alert("Ошибка: " + data.error);
+//                 return;
+//             }
+
+//             if (data.accepted) {
+//                 // Показываем красивый оверлей с кнопкой
+//                 mainContainer.classList.add('blurred');
+//                 successOverlay.classList.add('visible');
+//             } else {
+//                 // Показываем обычный результат для отклонения
+//                 resultMessage.textContent = "Резюме отклонено ❌";
+//                 resultSection.classList.remove('hidden');
+//             }
+
+//         }, 2000); // Имитация загрузки
+
+//     } catch (err) {
+//         loadingOverlay.classList.remove('visible');
+//         mainContainer.classList.remove('blurred');
+//         console.error("Ошибка:", err);
+//         alert("Ошибка сервера: " + err.message);
+//     }
+// });
+resumeForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const fullname = document.getElementById('fullname').value.trim();
+    const topic = topicSelect.value;
+    
+    if (!fullname || !fileInput.files.length || !topic) {
+        alert("Заполните все обязательные поля");
+        return;
+    }
+
+    const formData = new FormData();
+    formData.append('resume', fileInput.files[0]);
+    formData.append('fullname', fullname);
+    formData.append('interview-topic', topic);
+
+    // Показываем лоадер поверх всего
+    mainContainer.classList.add('blurred');
+    loadingOverlay.classList.add('visible');
+    resultSection.classList.add('hidden'); // Гарантируем, что результат скрыт
+
     try {
         const response = await fetch('http://localhost:5001/api/upload-resume', {
             method: 'POST',
             body: formData
         });
-        
+
         const data = await response.json();
 
+        // Скрываем лоадер после получения ответа
+        loadingOverlay.classList.remove('visible');
+
         if (data.success) {
-            showResult(data.message, data.passed, data.data || {});
+            if (data.accepted) {
+                // Показываем success-оверлей для принятых резюме
+                successOverlay.classList.add('visible');
+            } else {
+                // Показываем failure-оверлей для отклоненных резюме
+                showFailureDetails(data.message, data.errors || []);
+                failureOverlay.classList.add('visible');
+            }
         } else {
-            showResult(data.error || 'Произошла ошибка при обработке', false, {});
+            // Показываем failure-оверлей для ошибок
+            showFailureDetails(data.error || 'Произошла ошибка при обработке', []);
+            failureOverlay.classList.add('visible');
         }
-        
-    } catch (error) {
-        showResult(`Ошибка соединения с сервером: ${error}`, false, {});
-        console.error('Ошибка fetch:', error);
-    } finally {
-        showLoading(false);
-        submitButton.disabled = false;
-    }
-}
 
-function showLoading(show) {
-    const loading = document.getElementById('loading');
-    const form = document.getElementById('resume-form');
-    
-    if (show) {
-        loading.classList.remove('hidden');
-        form.classList.add('hidden');
+    } catch (err) {
+        // Скрываем лоадер в случае ошибки
+        loadingOverlay.classList.remove('visible');
+        mainContainer.classList.remove('blurred');
+        console.error("Ошибка:", err);
+        // Показываем failure-оверлей для сетевых ошибок
+        showFailureDetails("Ошибка сервера: " + err.message, []);
+        failureOverlay.classList.add('visible');
+    }
+});
+
+function showFailureDetails(message, errors) {
+    const errorDetails = document.getElementById('error-details');
+    errorDetails.innerHTML = '';
+
+    if (message) {
+        const messageElem = document.createElement('p');
+        messageElem.textContent = message;
+        messageElem.style.fontWeight = 'bold';
+        errorDetails.appendChild(messageElem);
+    }
+
+    if (errors && errors.length > 0) {
+        const list = document.createElement('ul');
+        errors.forEach(error => {
+            const item = document.createElement('li');
+            item.textContent = error;
+            list.appendChild(item);
+        });
+        errorDetails.appendChild(list);
     } else {
-        loading.classList.add('hidden');
-        form.classList.remove('hidden');
+        errorDetails.innerHTML += '<p>Попробуйте проверить резюме на соответствие требованиям вакансии.</p>';
     }
 }
 
-function showResult(message, isSuccess, data) {
-    const resultSection = document.getElementById('result-section');
-    const resultMessage = document.getElementById('result-message');
-    
-    let resultHTML = `<div class="result-header">${message}</div>`;
-    
-    if (isSuccess && Object.keys(data).length > 0) {
-        resultHTML += `
-            <div class="result-details">
-                <div class="score">Общий балл: <strong>${data.score}/100</strong></div>
-                <div class="candidate">Кандидат: <strong>${data.candidate_name}</strong></div>
-                
-                ${data.matched_requirements && data.matched_requirements.length > 0 ? `
-                <div class="requirements">
-                    <h3>✅ Соответствует требованиям:</h3>
-                    <ul>${data.matched_requirements.map(req => `<li>${req}</li>`).join('')}</ul>
-                </div>` : ''}
-                
-                ${data.missing_requirements && data.missing_requirements.length > 0 ? `
-                <div class="requirements">
-                    <h3>❌ Не хватает:</h3>
-                    <ul>${data.missing_requirements.map(req => `<li>${req}</li>`).join('')}</ul>
-                </div>` : ''}
-                
-                <div class="details">
-                    <p>${data.details}</p>
-                </div>
-                
-                <div class="recommendation">
-                    <strong>Рекомендация:</strong> ${data.recommendation}
-                </div>
-                
-                <div class="analysis-date">
-                    Анализ проведен: ${data.analysis_date}
-                </div>
-            </div>
-        `;
-    }
-    
-    resultMessage.innerHTML = resultHTML;
-    resultMessage.className = isSuccess ? 'result-message success' : 'result-message error';
-    resultSection.classList.remove('hidden');
-}
-
-function resetForm() {
-    const form = document.getElementById('resume-form');
-    const resultSection = document.getElementById('result-section');
-    const fileName = document.getElementById('file-name');
-    
-    form.reset();
-    fileName.textContent = '';
+window.resetForm = function() {
+    resumeForm.reset();
     resultSection.classList.add('hidden');
-}
+    fileNameDiv.textContent = '';
+    
+    // Сбрасываем состояние формы
+    fileInput.disabled = true;
+    fileLabel.classList.add('disabled');
+    fileLabel.querySelector('.file-text').textContent = 'Выберите файл (доступно после выбора темы)';
+    submitBtn.disabled = true;
+    
+    // Убираем размытие и оверлеи
+    mainContainer.classList.remove('blurred');
+    successOverlay.classList.remove('visible');
+    failureOverlay.classList.remove('visible');
+    loadingOverlay.classList.remove('visible');
+    
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+};
+});

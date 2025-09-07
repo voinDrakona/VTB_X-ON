@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 import torch
 import sounddevice as sd
+from TTS.api import TTS
 
 from resume_check import analyze_resume 
 from into_text import extract_text_from_file
@@ -18,6 +19,8 @@ from into_text import extract_text_from_file
 PASSING_SCORE_RESUME    = 49
 COUNT_QUESTIONS         = 5
 PASSING_SCORE_INTERVIEW = 3
+
+tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2")
 
 model, _ = torch.hub.load(
     repo_or_dir='snakers4/silero-models',
@@ -57,12 +60,16 @@ def allowed_file(filename):
 # def speak_text_local(text):
 #     subprocess.run(["say", "-v", "Milena", text])
 
-def speak_text_local(text: str):
-    audio = model.apply_tts(text=text, speaker=speaker, sample_rate=sample_rate)
+def speak_text_local(text):
+    audio = tts.tts(text, speaker="Claribel Dervla", language="ru")
+    sd.play(audio, samplerate=tts.synthesizer.output_sample_rate)
 
-    # Воспроизведение через динамики
-    sd.play(audio, sample_rate)
-    sd.wait()
+# def speak_text_local(text: str):
+#     audio = model.apply_tts(text=text, speaker=speaker, sample_rate=sample_rate)
+
+#     # Воспроизведение через динамики
+#     sd.play(audio, sample_rate)
+#     sd.wait()
 
 # -------------------- Логика интервью --------------------
 class InterviewState:
@@ -90,7 +97,7 @@ def start_interview_with_resume():
         f"Вот резюме кандидата:\n{state.resume_text}\n\n"
         f"Вот специальность для кандидата:\n{state.topic}\n\n"
         f"Выдели направление и начни интервью с первого вопроса по ней."
-        "Ты можешь залавать более углублённые впросы исходя из предыдущего вопросв"
+        "Ты можешь залавать более углублённые впросы исходя из предыдущих вопросов"
     )
 
     state.story_messages = [
@@ -110,37 +117,64 @@ def start_interview_with_resume():
     return first_question
 
 
-# Получили ответ безработного
+# # Получили ответ безработного
+# def evaluate_answer(answer):
+#     state.story_messages.append({"role": "user", "content": answer})
+
+#     response = client.chat.completions.create(
+#         model="gpt-4o-mini",
+#         messages=[
+#             {
+#                 "role": "assistant",
+#                 "content": (
+#                     f"Проанализируй историюю общения:\n{state.story_messages}\n\n"
+#                     "и составь следующий вопрос собеседования."
+#                     "не пиши лишний текст."
+#                 )
+#             }
+#         ],
+#     )
+#     next_question = response.choices[0].message.content.strip()
+#     print("gpt_next_question:", next_question)
+#     speak_text_local(next_question)
+#     state.story_messages.append({"role": "assistant", "content": next_question})
+
+#     # отдельный запрос для оценки ответа (НЕ пишем это в messages!)
+#     eval_answer = client.chat.completions.create(
+#         model="gpt-4o-mini",
+#         messages=[
+#             {
+#                 "role": "system",
+#                 "content": (
+#                     "Ты интервьюер. Оцени последний ответ кандидата строго в JSON: "
+#                     "{\"score\": int, \"reasoning\": str}. "
+#                     "Не задавай вопросы, не пиши лишний текст."
+#                 )
+#             },
+#             {"role": "user", "content": answer}
+#         ],
+#         response_format={"type": "json_object"}
+#     )
+
+#     evaluation = json.loads(eval_answer.choices[0].message.content)
+#     state.scores.append(evaluation["score"])
+
+#     return evaluation, next_question
+
 def evaluate_answer(answer):
     state.story_messages.append({"role": "user", "content": answer})
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "assistant",
-                "content": (
-                    f"Проанализируй историюю общения:\n{state.story_messages}\n\n"
-                    "и составь следующий вопрос собеседования."
-                    "не пиши лишний текст."
-                )
-            }
-        ],
-    )
-    next_question = response.choices[0].message.content.strip()
-    print("gpt_next_question:", next_question)
-    speak_text_local(next_question)
-    state.story_messages.append({"role": "assistant", "content": next_question})
-
-    # отдельный запрос для оценки ответа (НЕ пишем это в messages!)
     eval_answer = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
             {
                 "role": "system",
                 "content": (
-                    "Ты интервьюер. Оцени последний ответ кандидата строго в JSON: "
-                    "{\"score\": int, \"reasoning\": str}. "
+                    "Ты интервьюер."
+                    f"Проанализируй историюю общения:\n{state.story_messages}\n\n"
+                    "и составь следующий вопрос собеседования."
+                    "Оцени последний ответ кандидата строго в JSON: "
+                    "{\"score\": int, \"reasoning\": str, \"next question\": str}. "
                     "Не задавай вопросы, не пиши лишний текст."
                 )
             },
@@ -150,11 +184,14 @@ def evaluate_answer(answer):
     )
 
     evaluation = json.loads(eval_answer.choices[0].message.content)
+    next_question = evaluation["next question"]
+    print("gpt_next_question:", next_question)
+    speak_text_local(next_question)
+    state.story_messages.append({"role": "assistant", "content": next_question})
+
     state.scores.append(evaluation["score"])
 
-    return evaluation, next_question
-
-
+    return evaluation
 
 # -------------------- Роуты --------------------
 @app.route('/')
@@ -227,7 +264,7 @@ def post_answer():
 
     state = sessions[session_id]
 
-    evaluation, next_question = evaluate_answer(answer)
+    evaluation = evaluate_answer(answer)
 
     finished = len(state.scores) >= COUNT_QUESTIONS
     passed = finished and (sum(state.scores) / len(state.scores) >= PASSING_SCORE_INTERVIEW)
@@ -239,7 +276,7 @@ def post_answer():
     return jsonify({
         "reasoning": evaluation["reasoning"],
         "score": evaluation["score"],
-        "next_question": next_question,
+        "next_question": evaluation["next question"],
         "finished": finished,
         "passed": passed
     })

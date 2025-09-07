@@ -1,0 +1,112 @@
+/* .chat-container { max-width: 700px; margin: 20px auto; border: 1px solid #ddd; border-radius: 10px; padding: 15px; background: #fafafa; }
+.chat-box { height: 400px; overflow-y: auto; border: 1px solid #ccc; padding: 10px; margin-bottom: 15px; background: white; display: flex; flex-direction: column; }
+.msg { margin: 8px 0; padding: 8px 12px; border-radius: 8px; max-width: 80%; }
+.msg.bot { background: #e3f2fd; align-self: flex-start; }
+.msg.user { background: #c8e6c9; align-self: flex-end; margin-left: auto; }
+.chat-input { display: flex; gap: 10px; }
+.chat-input input { flex: 1; padding: 8px; } */
+
+.chat-container { 
+    max-width: 700px; 
+    margin: 20px auto; 
+    border: 1px solid #ddd; 
+    border-radius: 10px; 
+    padding: 15px; 
+    background: #fafafa; 
+}
+
+.chat-box { 
+    height: 400px; 
+    overflow-y: auto; 
+    border: 1px solid #ccc; 
+    padding: 10px; 
+    margin-bottom: 15px; 
+    background: white; 
+    display: flex; 
+    flex-direction: column; 
+}
+
+.msg { 
+    margin: 8px 0; 
+    padding: 8px 12px; 
+    border-radius: 8px; 
+    max-width: 80%; 
+}
+
+.msg.bot { 
+    background: #e3f2fd; 
+    align-self: flex-start; 
+}
+
+.msg.user { 
+    background: #c8e6c9; 
+    align-self: flex-end; 
+    margin-left: auto; 
+}
+
+.chat-input { 
+    display: flex; 
+    gap: 10px; 
+}
+
+.chat-input input { 
+    flex: 1; 
+    padding: 8px; 
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+.chat-input button {
+    padding: 8px 15px;
+    border: none;
+    border-radius: 5px;
+    background: #667eea;
+    color: white;
+    cursor: pointer;
+}
+
+.chat-input button:hover {
+    background: #5a67d8;
+}
+
+#voice-btn {
+    background: #48bb78;
+}
+
+#voice-btn:hover {
+    background: #38a169;
+}
+
+#setup-section {
+    text-align: center;
+    padding: 20px;
+}
+
+#setup-section label {
+    margin-right: 10px;
+    font-weight: bold;
+}
+
+#setup-section select {
+    padding: 5px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+}
+
+#setup-section button {
+    padding: 10px 20px;
+    background: #667eea;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-left: 10px;
+}
+
+#setup-section button:hover {
+    background: #5a67d8;
+}
+
+.hidden {
+    display: none !important;
+}
