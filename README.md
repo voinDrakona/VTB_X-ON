@@ -24,7 +24,7 @@ VTB_X-ON/
     └── js/                     # фронтенд‑логика
 ```
 
-> ✅ Рендер шаблонов идет из `frontend/` (см. `template_folder` и `static_folder` в `app.py`).
+> Рендер шаблонов идет из `frontend/` (см. `template_folder` и `static_folder` в `app.py`).
 
 ---
 
