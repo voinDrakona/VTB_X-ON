@@ -147,21 +147,8 @@ http://localhost:5001/
 
 ---
 
-Полезные команды
 
-```bash
-# Обновление pip
-pip install --upgrade pip
-
-# Сохранить точные версии в lock-файл (необязательно)
-pip freeze > pinned-requirements.txt
-
-# Деактивация виртуального окружения
-deactivate
-```
-
-
-API (кратко)
+API
 
 - `GET /` — главная страница (шаблон `frontend/index.html`).
 - `POST /api/upload-resume` — загрузка резюме, параметры формы: `fullname`, `interview-topic`, `select_language`, файл `resume`.
