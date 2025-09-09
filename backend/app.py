@@ -6,10 +6,6 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from dotenv import load_dotenv
 from openai import OpenAI
-import subprocess
-# import simpleaudio  # для воспроизведения .wav
-import tempfile
-import torch
 import sounddevice as sd
 from TTS.api import TTS
 
@@ -21,18 +17,6 @@ COUNT_QUESTIONS         = 5
 PASSING_SCORE_INTERVIEW = 3
 
 tts = TTS("tts_models/multilingual/multi-dataset/xtts_v2")
-
-model, _ = torch.hub.load(
-    repo_or_dir='snakers4/silero-models',
-    model='silero_tts',
-    language='ru',
-    speaker='v3_1_ru'
-)
-
-# Настройки
-sample_rate = 48000
-speaker = 'baya'  # варианты: 'aidar', 'baya', 'kseniya', 'xenia', 'eugene'
-
 
 # -------------------- Инициализация --------------------
 load_dotenv()
@@ -52,24 +36,23 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16 MB
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
-
 # -------------------- Вспомогательные --------------------
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
-# def speak_text_local(text):
-#     subprocess.run(["say", "-v", "Milena", text])
+def speak_text_local(text, language="en"):
+    # если язык не указан или пустой → ставим "en" по умолчанию
+    if not language:
+        language = "en"
 
-def speak_text_local(text):
-    audio = tts.tts(text, speaker="Claribel Dervla", language="ru")
+    # синтез речи
+    audio = tts.tts(
+        text=text,
+        speaker="Claribel Dervla",  # выбери подходящий голос
+        language=language
+    )
     sd.play(audio, samplerate=tts.synthesizer.output_sample_rate)
-
-# def speak_text_local(text: str):
-#     audio = model.apply_tts(text=text, speaker=speaker, sample_rate=sample_rate)
-
-#     # Воспроизведение через динамики
-#     sd.play(audio, sample_rate)
-#     sd.wait()
+    sd.wait()
 
 # -------------------- Логика интервью --------------------
 class InterviewState:
@@ -77,6 +60,7 @@ class InterviewState:
         self.topic = ""
         self.level = ""
         self.resume_text = ""
+        self.language = "en"  # язык по умолчанию
         self.story_messages = []
         self.scores = []
         self.finished = False
@@ -87,6 +71,14 @@ state = InterviewState()
 
 # Создаём system prompt + сразу первый вопрос от GPT
 def start_interview_with_resume():
+    # Определяем язык для промпта на основе выбранного языка
+    language_prompt = ""
+    if state.language == "ru":
+        language_prompt = "Проводи собеседование на русском языке."
+    elif state.language == "en":
+        language_prompt = "Conduct the interview in English."
+    # Добавьте другие языки по необходимости
+    
     system_prompt = (
         "Ты — строгий технический интервьюер.\n"
         "Задавай вопросы на основе резюме кандидата и указанной темы.\n"
@@ -96,8 +88,9 @@ def start_interview_with_resume():
         "Ты должен выдавать JSON с оценкой: {\"score\": int, \"reasoning\": str}.\n"
         f"Вот резюме кандидата:\n{state.resume_text}\n\n"
         f"Вот специальность для кандидата:\n{state.topic}\n\n"
-        f"Выдели направление и начни интервью с первого вопроса по ней."
-        "Ты можешь залавать более углублённые впросы исходя из предыдущих вопросов"
+        f"{language_prompt}\n\n"
+        "Выдели направление и начни интервью с первого вопроса по ней."
+        "Ты можешь задавать более углублённые вопросы исходя из предыдущих вопросов"
     )
 
     state.story_messages = [
@@ -111,59 +104,22 @@ def start_interview_with_resume():
 
     first_question = response.choices[0].message.content.strip()
     print("gpt_response:", first_question)
-    speak_text_local(first_question)
+    speak_text_local(first_question, state.language)
     state.story_messages.append({"role": "assistant", "content": first_question})
 
     return first_question
 
 
-# # Получили ответ безработного
-# def evaluate_answer(answer):
-#     state.story_messages.append({"role": "user", "content": answer})
-
-#     response = client.chat.completions.create(
-#         model="gpt-4o-mini",
-#         messages=[
-#             {
-#                 "role": "assistant",
-#                 "content": (
-#                     f"Проанализируй историюю общения:\n{state.story_messages}\n\n"
-#                     "и составь следующий вопрос собеседования."
-#                     "не пиши лишний текст."
-#                 )
-#             }
-#         ],
-#     )
-#     next_question = response.choices[0].message.content.strip()
-#     print("gpt_next_question:", next_question)
-#     speak_text_local(next_question)
-#     state.story_messages.append({"role": "assistant", "content": next_question})
-
-#     # отдельный запрос для оценки ответа (НЕ пишем это в messages!)
-#     eval_answer = client.chat.completions.create(
-#         model="gpt-4o-mini",
-#         messages=[
-#             {
-#                 "role": "system",
-#                 "content": (
-#                     "Ты интервьюер. Оцени последний ответ кандидата строго в JSON: "
-#                     "{\"score\": int, \"reasoning\": str}. "
-#                     "Не задавай вопросы, не пиши лишний текст."
-#                 )
-#             },
-#             {"role": "user", "content": answer}
-#         ],
-#         response_format={"type": "json_object"}
-#     )
-
-#     evaluation = json.loads(eval_answer.choices[0].message.content)
-#     state.scores.append(evaluation["score"])
-
-#     return evaluation, next_question
-
 def evaluate_answer(answer):
     state.story_messages.append({"role": "user", "content": answer})
 
+    # Добавляем информацию о языке в промпт для оценки
+    language_prompt = ""
+    if state.language == "ru":
+        language_prompt = "Отвечай на русском языке."
+    elif state.language == "en":
+        language_prompt = "Respond in English."
+    
     eval_answer = client.chat.completions.create(
         model="gpt-4o-mini",
         messages=[
@@ -171,10 +127,11 @@ def evaluate_answer(answer):
                 "role": "system",
                 "content": (
                     "Ты интервьюер."
-                    f"Проанализируй историюю общения:\n{state.story_messages}\n\n"
+                    f"Проанализируй историю общения:\n{state.story_messages}\n\n"
                     "и составь следующий вопрос собеседования."
                     "Оцени последний ответ кандидата строго в JSON: "
                     "{\"score\": int, \"reasoning\": str, \"next question\": str}. "
+                    f"{language_prompt}\n"
                     "Не задавай вопросы, не пиши лишний текст."
                 )
             },
@@ -186,7 +143,7 @@ def evaluate_answer(answer):
     evaluation = json.loads(eval_answer.choices[0].message.content)
     next_question = evaluation["next question"]
     print("gpt_next_question:", next_question)
-    speak_text_local(next_question)
+    speak_text_local(next_question, state.language)
     state.story_messages.append({"role": "assistant", "content": next_question})
 
     state.scores.append(evaluation["score"])
@@ -204,6 +161,10 @@ def upload_resume():
     try:
         fullname = request.form.get('fullname')
         topic = request.form.get('interview-topic')
+        language = request.form.get('select_language')
+
+        # Сохраняем выбранный язык в глобальное состояние
+        state.language = language
 
         if 'resume' not in request.files:
             return jsonify({'success': False, 'error': 'Файл не найден'})
@@ -217,10 +178,10 @@ def upload_resume():
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], filename)
             file.save(filepath)
 
-            # result = analyze_resume(filepath, PASSING_SCORE_RESUME)
             result = analyze_resume(filepath, PASSING_SCORE_RESUME, topic)
 
             state.resume_text = extract_text_from_file(filepath)
+            state.topic = topic  # сохраняем тему
             result['resume_text'] = state.resume_text
 
             # добавь поле accepted

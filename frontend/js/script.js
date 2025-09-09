@@ -9,6 +9,7 @@ const fileInput = document.getElementById('resume-file');
 const fileNameDiv = document.getElementById('file-name');
 const fileLabel = document.getElementById('file-label');
 const topicSelect = document.getElementById('interview-topic');
+const languageSelect = document.getElementById('select_language');
 const submitBtn = document.getElementById('submit-btn');
 const failureOverlay = document.getElementById('failure-overlay');
 
@@ -21,7 +22,22 @@ topicSelect.addEventListener('change', function() {
     } else {
         fileInput.disabled = true;
         fileLabel.classList.add('disabled');
-        fileLabel.querySelector('.file-text').textContent = 'Выберите файл (доступно после выбора темы)';
+        fileLabel.querySelector('.file-text').textContent = 'Выберите файл (доступно после выбора языка и темы)';
+        fileNameDiv.textContent = '';
+        submitBtn.disabled = true;
+    }
+});
+
+// Обработчик изменения выбора языка
+languageSelect.addEventListener('change', function() {
+    if (languageSelect.value !== '') {
+        fileInput.disabled = false;
+        fileLabel.classList.remove('disabled');
+        fileLabel.querySelector('.file-text').textContent = 'Выберите файл';
+    } else {
+        fileInput.disabled = true;
+        fileLabel.classList.add('disabled');
+        fileLabel.querySelector('.file-text').textContent = 'Выберите файл (доступно после выбора языка и темы)';
         fileNameDiv.textContent = '';
         submitBtn.disabled = true;
     }
@@ -33,7 +49,7 @@ fileInput.addEventListener('change', () => {
         fileNameDiv.textContent = fileInput.files[0].name;
         // Проверяем, заполнены ли все обязательные поля
         const fullname = document.getElementById('fullname').value.trim();
-        if (fullname && topicSelect.value) {
+        if (fullname && topicSelect.value && languageSelect) {
             submitBtn.disabled = false;
         }
     } else {
@@ -51,84 +67,6 @@ document.getElementById('fullname').addEventListener('input', function() {
     submitBtn.disabled = !(fullname && hasFile && hasTopic);
 });
 
-// resumeForm.addEventListener('submit', async (e) => {
-//     e.preventDefault();
-
-//     const fullname = document.getElementById('fullname').value.trim();
-//     const topic = topicSelect.value;
-    
-//     if (!fullname || !fileInput.files.length || !topic) {
-//         alert("Заполните все обязательные поля");
-//         return;
-//     }
-
-//     const formData = new FormData();
-//     formData.append('resume', fileInput.files[0]);
-//     formData.append('fullname', fullname);
-//     formData.append('interview-topic', topic);
-
-//     // Показываем лоадер поверх всего
-//     mainContainer.classList.add('blurred');
-//     loadingOverlay.classList.add('visible');
-//     resultSection.classList.add('hidden');
-
-//     try {
-//         const response = await fetch('http://localhost:5001/api/upload-resume', {
-//             method: 'POST',
-//             body: formData
-//         });
-
-//         const data = await response.json();
-
-//         if (data.success) {
-//             showResult(data.message, data.passed, data.data || {});
-//         } else {
-//             showResult(data.error || 'Произошла ошибка при обработке', false, {});
-//         }
-
-
-//         function showResult(message, passed, extraData) {
-//         const resultSection = document.getElementById('result-section');
-//         const resultMessage = document.getElementById('result-message');
-
-//         if (passed) {
-//             resultMessage.textContent = message || "Резюме прошло проверку ✅";
-//         } else {
-//             resultMessage.textContent = message || "Резюме отклонено ❌";
-//         }
-
-//         resultSection.classList.remove('hidden');
-//     }
-        
-//         setTimeout(() => {
-//             // Скрываем лоадер
-//             loadingOverlay.classList.remove('visible');
-//             mainContainer.classList.remove('blurred');
-
-//             if (data.error) {
-//                 alert("Ошибка: " + data.error);
-//                 return;
-//             }
-
-//             if (data.accepted) {
-//                 // Показываем красивый оверлей с кнопкой
-//                 mainContainer.classList.add('blurred');
-//                 successOverlay.classList.add('visible');
-//             } else {
-//                 // Показываем обычный результат для отклонения
-//                 resultMessage.textContent = "Резюме отклонено ❌";
-//                 resultSection.classList.remove('hidden');
-//             }
-
-//         }, 2000); // Имитация загрузки
-
-//     } catch (err) {
-//         loadingOverlay.classList.remove('visible');
-//         mainContainer.classList.remove('blurred');
-//         console.error("Ошибка:", err);
-//         alert("Ошибка сервера: " + err.message);
-//     }
-// });
 resumeForm.addEventListener('submit', async (e) => {
     e.preventDefault();
 
