@@ -56,21 +56,20 @@ def speak_text_local(text, language="en"):
 
 # -------------------- Логика интервью --------------------
 class InterviewState:
-    def __init__(self):
+    def __init__(self, language="en"):
         self.topic = ""
         self.level = ""
         self.resume_text = ""
-        self.language = "en"  # язык по умолчанию
+        self.language = language  # язык по умолчанию
         self.story_messages = []
         self.scores = []
         self.finished = False
 
 
 sessions = {}
-state = InterviewState()
 
 # Создаём system prompt + сразу первый вопрос от GPT
-def start_interview_with_resume():
+def start_interview_with_resume(state):
     # Определяем язык для промпта на основе выбранного языка
     language_prompt = ""
     if state.language == "ru":
@@ -110,7 +109,7 @@ def start_interview_with_resume():
     return first_question
 
 
-def evaluate_answer(answer):
+def evaluate_answer(answer, state):
     state.story_messages.append({"role": "user", "content": answer})
 
     # Добавляем информацию о языке в промпт для оценки
@@ -163,9 +162,6 @@ def upload_resume():
         topic = request.form.get('interview-topic')
         language = request.form.get('select_language')
 
-        # Сохраняем выбранный язык в глобальное состояние
-        state.language = language
-
         if 'resume' not in request.files:
             return jsonify({'success': False, 'error': 'Файл не найден'})
 
@@ -180,9 +176,9 @@ def upload_resume():
 
             result = analyze_resume(filepath, PASSING_SCORE_RESUME, topic)
 
-            state.resume_text = extract_text_from_file(filepath)
-            state.topic = topic  # сохраняем тему
-            result['resume_text'] = state.resume_text
+            resume_text = extract_text_from_file(filepath)
+            result['resume_text'] = resume_text
+            result['language'] = language  # Добавляем язык в ответ
 
             # добавь поле accepted
             result['accepted'] = result.get("passed", False)
@@ -205,9 +201,16 @@ def interview_page():
 def start_interview():
     data = request.json
     resume_text = data.get("resume_text")
+    language = data.get("language", "en")  # Получаем язык из запроса, по умолчанию английский
+    topic = data.get("topic", "")
+
+    # Создаем новое состояние интервью с указанным языком
+    state = InterviewState(language=language)
+    state.resume_text = resume_text
+    state.topic = topic
 
     session_id = str(uuid.uuid4())
-    first_question = start_interview_with_resume()
+    first_question = start_interview_with_resume(state)
 
     sessions[session_id] = state
 
@@ -219,13 +222,18 @@ def post_answer():
     data = request.json
     session_id = data.get("session_id")
     answer = data.get("answer")
+    language = data.get("language", "en")  # Получаем язык из запроса
 
     if session_id not in sessions:
         return jsonify({"error": "Session not found"}), 404
 
     state = sessions[session_id]
+    
+    # Обновляем язык в состоянии, если он передан
+    if language:
+        state.language = language
 
-    evaluation = evaluate_answer(answer)
+    evaluation = evaluate_answer(answer, state)
 
     finished = len(state.scores) >= COUNT_QUESTIONS
     passed = finished and (sum(state.scores) / len(state.scores) >= PASSING_SCORE_INTERVIEW)

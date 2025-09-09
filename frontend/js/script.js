@@ -100,6 +100,13 @@ resumeForm.addEventListener('submit', async (e) => {
         loadingOverlay.classList.remove('visible');
 
         if (data.success) {
+            // Сохраняем данные резюме в localStorage для использования в интервью
+            localStorage.setItem('resume_data', JSON.stringify({
+                resume_text: data.resume_text,
+                topic: topic,
+                language: languageSelect.value
+            }));
+            
             if (data.accepted) {
                 // Показываем success-оверлей для принятых резюме
                 successOverlay.classList.add('visible');

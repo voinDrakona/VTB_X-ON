@@ -6,6 +6,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const userInput = document.getElementById("user-answer");
     const voiceBtn = document.getElementById("voice-btn");
 
+    // Получаем выбранный язык, текс и тему из localStorage
+    const resumeData = JSON.parse(localStorage.getItem('resume_data') || '{}');
+    const selectedLanguage = resumeData.language || 'ru';
+    const resumeText = resumeData.resume_text || '';
+    const topic = resumeData.topic || '';
+    
+    // Устанавливаем язык для голосового ввода
+    const languageMap = {
+        'ru': 'ru-RU',
+        'en': 'en-US'
+    };
+    const speechLang = languageMap[selectedLanguage] || 'ru-RU';
+
     // Добавляем начальное сообщение
     addMessage("Добро пожаловать на онлайн-собеседование! Нажмите 'Начать собеседование'.", "bot");
 
@@ -19,10 +32,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
     window.startInterview = async function() {
         try {
+            
             const resp = await fetch("/api/start_interview", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({})
+                body: JSON.stringify({
+                    language: selectedLanguage, // Передаем язык, текс и тему на сервер
+                    resume_text: resumeText,
+                    topic: topic
+                })
             });
             
             if (!resp.ok) {
@@ -59,7 +77,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const resp = await fetch("/api/answer", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ session_id: sessionId, answer })
+                body: JSON.stringify({ 
+                    session_id: sessionId, 
+                    answer,
+                    language: selectedLanguage // Передаем язык с каждым ответом
+                })
             });
             
             if (!resp.ok) {
@@ -81,6 +103,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 userInput.disabled = true;
                 document.querySelector('button[onclick="sendAnswer()"]').disabled = true;
                 if (voiceBtn) voiceBtn.disabled = true;
+                
+                // Очищаем localStorage после завершения интервью
+                localStorage.removeItem('interview_language');
             }
         } catch (error) {
             console.error("Error sending answer:", error);
@@ -88,12 +113,12 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
 
-    // Голосовой ввод
+    // Голосовой ввод с учетом выбранного языка
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
 
     if (SpeechRecognition) {
         const recognition = new SpeechRecognition();
-        recognition.lang = "ru";
+        recognition.lang = speechLang; // Используем выбранный язык
         recognition.continuous = false;
         recognition.interimResults = false;
 
@@ -123,4 +148,9 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         alert("Ваш браузер не поддерживает голосовой ввод");
     }
+
+    // Очистка localStorage при закрытии страницы
+    window.addEventListener('beforeunload', function() {
+        localStorage.removeItem('interview_language');
+    });
 });
